@@ -1,8 +1,9 @@
 using Application.Core;
-using AutoMapper;
+using Application.Interfaces;
 using Domain;
 using FluentValidation;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 using Persistence;
 
 namespace Application.Activities
@@ -11,39 +12,43 @@ namespace Application.Activities
     {
         public class Command : IRequest<Result<Unit>>
         {
+            public string DisplayName { get; set; }
+            public string Bio { get; set; }
             public Activity Activity { get; set; }
         }
+
 
         public class CommandValidator : AbstractValidator<Command>
         {
             public CommandValidator()
             {
-                RuleFor(x => x.Activity).SetValidator(new ActivityValidator());
+                RuleFor(x => x.DisplayName).NotEmpty();
             }
         }
 
         public class Handler : IRequestHandler<Command, Result<Unit>>
         {
             private readonly DataContext _context;
-            private readonly IMapper _mapper;
-            public Handler(DataContext context, IMapper mapper)
+            private readonly IUserAccessor _userAccessor;
+
+            public Handler(DataContext context, IUserAccessor userAccessor)
             {
-                _context = context;  
-                _mapper = mapper;
+                _context = context;
+                _userAccessor = userAccessor;
             }
+
             public async Task<Result<Unit>> Handle(Command request, CancellationToken cancellationToken)
             {
-                var activity = await _context.Activities.FindAsync(request.Activity.Id);
+                var user = await _context.Users.FirstOrDefaultAsync(x => x.UserName == _userAccessor.GetUsername());
 
-                if (activity == null) return  null;
+                user.Bio = request.Bio ?? user.Bio;
+                user.DisplayName = request.DisplayName ?? user.DisplayName;
 
-                _mapper.Map(request.Activity, activity);
+                var success = await _context.SaveChangesAsync() > 0;
 
-                var result = await _context.SaveChangesAsync() > 0;
+                if (success) return Result<Unit>.Success(Unit.Value);
 
-                if (!result) return Result<Unit>.Failure("Failed to update activity");
-
-                return Result<Unit>.Success(Unit.Value);
+                return Result<Unit>.Failure("Problem updating profile");
             }
         }
     }
