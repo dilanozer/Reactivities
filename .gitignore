@@ -484,3 +484,4 @@ $RECYCLE.BIN/
 *.swp
 API/appsettings.json
 API/reactivities.db
+client/src/app/shared/components/LocationInput.tsx
